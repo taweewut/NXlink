@@ -448,28 +448,49 @@
 
   // ── Remove existing widget from DOM ──────────────────
   function destroyWidget() {
+    // Remove script tag
     const old = document.getElementById('live-chat-script');
-    if (old) { old.remove(); log('Old live-chat-script removed.', 'info'); }
-    // Remove any iframe/div injected by live_chat.min.js
-    document.querySelectorAll('[id^="nx-"], [class^="nx-"], [id*="livechat"], [id*="nxchat"]').forEach(el => el.remove());
-    sessionStorage.clear();
+    if (old) { old.remove(); log('Old script removed.', 'info'); }
+
+    // Remove ALL iframes (NXLink chat lives inside one)
+    document.querySelectorAll('iframe').forEach(el => {
+      log(`Removed iframe: ${(el.src||'').slice(0,60)}`, 'info');
+      el.remove();
+    });
+
+    // Remove any NXLink-injected top-level elements
+    document.querySelectorAll('body > div:not(.header):not(.container)').forEach(el => el.remove());
+
+    // Clear session + local storage (NXLink uses both)
+    try { sessionStorage.clear(); } catch(e) {}
+    try {
+      Object.keys(localStorage)
+        .filter(k => /nx|chat|livechat/i.test(k))
+        .forEach(k => { localStorage.removeItem(k); log(`Cleared localStorage key: ${k}`, 'info'); });
+    } catch(e) {}
   }
 
-  // ── Load live_chat.min.js with JWT in URL ─────────────
-  function loadLiveChatScript(jwt) {
+  // ── Load live_chat.min.js with JWT + identity in URL ──
+  function loadLiveChatScript(jwt, identity) {
     destroyWidget();
+    const params = new URLSearchParams({ jwt, vtime: new Date().getTime() });
+    if (identity.custName)    params.set('custName',    identity.custName);
+    if (identity.phoneOrigin) params.set('phone',       identity.phoneOrigin);
+    if (identity.soldTo)      params.set('soldTo',      identity.soldTo);
+    if (identity.tier)        params.set('tier',        identity.tier);
+
     const s = document.createElement('script');
     s.id  = 'live-chat-script';
-    s.src = `https://nxlink.nxcloud.com/chatbot/client/js/live_chat.min.js?jwt=${jwt}&vtime=${new Date().getTime()}`;
+    s.src = `https://nxlink.nxcloud.com/chatbot/client/js/live_chat.min.js?${params.toString()}`;
+    log(`Script URL: …live_chat.min.js?jwt=…&custName=${identity.custName||''}&phone=${identity.phoneOrigin||''}&soldTo=${identity.soldTo||''}&tier=${identity.tier||''}`, 'info');
     s.onload = () => {
       log('live_chat.min.js loaded from nxlink.nxcloud.com.', 'ok');
-      // Expose any NXLink globals discovered after load
-      const keys = Object.keys(window).filter(k => /^nx/i.test(k) && typeof window[k] !== 'undefined');
-      if (keys.length) log(`NXLink globals detected: ${keys.join(', ')}`, 'info');
+      const keys = Object.keys(window).filter(k => /^nx/i.test(k));
+      if (keys.length) log(`NXLink globals: ${keys.join(', ')}`, 'info');
     };
     s.onerror = () => {
       log('Failed to load live_chat.min.js. Check network / CORS.', 'err');
-      showStatus('launchStatus', 'Could not load live_chat.min.js. Check console for details.', 'error');
+      showStatus('launchStatus', 'Could not load live_chat.min.js. Check console.', 'error');
     };
     document.head.appendChild(s);
   }
@@ -485,21 +506,16 @@
     const phoneOrigin = document.getElementById('phoneOrigin').value.trim();
     const soldTo      = document.getElementById('soldTo').value.trim();
     const tier        = document.getElementById('tier').value;
+    const identity    = { custName, phoneOrigin, soldTo, tier };
 
     const isMobile = window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
     if (isMobile) log('Mobile device detected.', 'info');
 
-    // Set identity params as globals BEFORE loading the script
-    // (NXLink reads these on init if present)
-    window.nxLiveChatCustomParams = { custName, phoneOrigin, soldTo, tier };
-    // Some NXLink versions use nxChatSetting
-    window.nxChatSetting = { custName, phone: phoneOrigin, soldTo, tier };
-
     try {
-      loadLiveChatScript(currentJWT);
+      loadLiveChatScript(currentJWT, identity);
       showStatus('launchStatus', 'Chat widget loading… Look for the chat bubble at the bottom-right.', 'success');
       log(`Launch initiated — identity: ${custName||'(guest)'} | phone: ${phoneOrigin||'(none)'} | soldTo: ${soldTo||'(none)'} | tier: ${tier||'(none)'}`, 'ok');
-      updateConfigPreview({ custName, phoneOrigin, soldTo, tier }, isMobile);
+      updateConfigPreview(identity, isMobile);
     } catch(e) {
       showStatus('launchStatus', 'Error launching chat: ' + e.message, 'error');
       log('Launch error: ' + e.message, 'err');
@@ -525,13 +541,11 @@
 
   // ── Widget Controls ───────────────────────────────────
   function reopenChat() {
-    // Try common NXLink API patterns after live_chat.min.js loads
     if (window.nxLiveChat && typeof window.nxLiveChat.open === 'function') {
       window.nxLiveChat.open(); log('nxLiveChat.open() called.', 'ok');
     } else if (window.NXLiveChat && typeof window.NXLiveChat.open === 'function') {
       window.NXLiveChat.open(); log('NXLiveChat.open() called.', 'ok');
     } else {
-      // Try clicking the widget bubble if visible
       const bubble = document.querySelector('[id*="nx"] button, [class*="nx"] button, #nxchat-button, .nx-chat-button');
       if (bubble) { bubble.click(); log('Widget bubble clicked.', 'ok'); }
       else log('No NXLink open() API found. Widget may already be visible.', 'info');
@@ -547,15 +561,44 @@
     }
   }
   function resetChat() {
-    log('Destroying widget and clearing session…', 'info');
-    destroyWidget();
-    showStatus('launchStatus', 'Session reset. Change scenario and click Launch Chat again.', 'info');
-    document.getElementById('configPreviewCard').style.display = 'none';
-    log('Widget removed, sessionStorage cleared. Ready to relaunch.', 'ok');
+    log('Resetting session — reloading page to guarantee clean state…', 'info');
+    // Save current JWT + scenario so the page restores on reload
+    const snap = {
+      jwt:         document.getElementById('jwtInput').value.trim(),
+      custName:    document.getElementById('custName').value.trim(),
+      phoneOrigin: document.getElementById('phoneOrigin').value.trim(),
+      soldTo:      document.getElementById('soldTo').value.trim(),
+      tier:        document.getElementById('tier').value,
+    };
+    try { sessionStorage.setItem('_nxHarnessSnap', JSON.stringify(snap)); } catch(e) {}
+
+    // Wipe NXLink storage keys, then reload
+    try {
+      Object.keys(localStorage)
+        .filter(k => /nx|chat|livechat/i.test(k))
+        .forEach(k => localStorage.removeItem(k));
+    } catch(e) {}
+
+    location.reload();
   }
 
-  // ── Auto-apply pre-filled JWT on load ─────────────────
+  // ── Restore state after reset-reload ─────────────────
   window.addEventListener('DOMContentLoaded', () => {
+    try {
+      const raw = sessionStorage.getItem('_nxHarnessSnap');
+      if (raw) {
+        sessionStorage.removeItem('_nxHarnessSnap');
+        const snap = JSON.parse(raw);
+        if (snap.jwt)         document.getElementById('jwtInput').value      = snap.jwt;
+        if (snap.custName)    document.getElementById('custName').value       = snap.custName;
+        if (snap.phoneOrigin) document.getElementById('phoneOrigin').value    = snap.phoneOrigin;
+        if (snap.soldTo)      document.getElementById('soldTo').value         = snap.soldTo;
+        if (snap.tier)        document.getElementById('tier').value           = snap.tier;
+        log('Session reset complete — identity restored. Ready to relaunch.', 'ok');
+      }
+    } catch(e) {}
+
+    // Auto-apply JWT if pre-filled
     const jwtField = document.getElementById('jwtInput');
     if (jwtField && jwtField.value.startsWith('ey')) {
       applyJWT();
