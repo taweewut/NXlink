@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HomePro Chat – Test Harness</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: #0066b3;
+      color: #fff;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .header-logo {
+      width: 36px; height: 36px;
+      background: #fff;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; color: #0066b3; font-size: 14px;
+    }
+    .header-title { font-size: 18px; font-weight: 600; }
+    .header-badge {
+      margin-left: auto;
+      background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.4);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    /* ── Layout ── */
+    .container {
+      max-width: 860px;
+      margin: 28px auto;
+      padding: 0 16px 80px;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #0066b3;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-title .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #0066b3;
+    }
+
+    /* ── JWT Row ── */
+    .jwt-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .jwt-row input {
+      flex: 1;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      background: #f8fafc;
+    }
+
+    /* ── Form Grid ── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 600px) {
+      .form-grid { grid-template-columns: 1fr; }
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 6px;
+    }
+    .form-group label span {
+      font-weight: 400;
+      color: #94a3b8;
+    }
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #1e293b;
+      transition: border-color 0.15s;
+      background: #fff;
+    }
+    .form-group input:focus, .form-group select:focus {
+      outline: none;
+      border-color: #0066b3;
+      box-shadow: 0 0 0 3px rgba(0,102,179,0.1);
+    }
+    .form-group input::placeholder { color: #cbd5e1; }
+
+    /* ── Scenario Pills ── */
+    .scenario-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+    .scenario-btn {
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1.5px solid #e2e8f0;
+      background: #f8fafc;
+      font-size: 12px;
+      font-weight: 500;
+      color: #475569;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .scenario-btn:hover {
+      border-color: #0066b3;
+      color: #0066b3;
+      background: #eff6ff;
+    }
+    .scenario-btn.active {
+      border-color: #0066b3;
+      background: #0066b3;
+      color: #fff;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: none;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-primary {
+      background: #0066b3;
+      color: #fff;
+    }
+    .btn-primary:hover { background: #0055a0; }
+    .btn-primary:disabled {
+      background: #94a3b8;
+      cursor: not-allowed;
+    }
+    .btn-outline {
+      background: #fff;
+      color: #0066b3;
+      border: 1.5px solid #0066b3;
+    }
+    .btn-outline:hover { background: #eff6ff; }
+    .btn-danger {
+      background: #fff;
+      color: #ef4444;
+      border: 1.5px solid #fca5a5;
+    }
+    .btn-danger:hover { background: #fef2f2; }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+
+    /* ── Status banner ── */
+    .status-banner {
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+      display: none;
+    }
+    .status-banner.success {
+      background: #f0fdf4;
+      border: 1px solid #86efac;
+      color: #166534;
+      display: flex;
+    }
+    .status-banner.error {
+      background: #fef2f2;
+      border: 1px solid #fca5a5;
+      color: #991b1b;
+      display: flex;
+    }
+    .status-banner.info {
+      background: #eff6ff;
+      border: 1px solid #93c5fd;
+      color: #1e40af;
+      display: flex;
+    }
+    .status-icon { font-size: 16px; }
+
+    /* ── Log ── */
+    .log-box {
+      background: #0f172a;
+      border-radius: 8px;
+      padding: 14px 16px;
+      max-height: 180px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .log-entry { color: #94a3b8; }
+    .log-entry.ok { color: #4ade80; }
+    .log-entry.err { color: #f87171; }
+    .log-entry.info { color: #60a5fa; }
+    .log-entry .ts { color: #475569; margin-right: 8px; }
+
+    /* ── Info chips ── */
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .chip {
+      background: #f1f5f9;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 11px;
+      color: #64748b;
+    }
+    .chip strong { color: #0f172a; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-logo">HP</div>
+  <div class="header-title">HomePro Chat — Test Harness</div>
+  <div class="header-badge">Bootstrap v1.4</div>
+</div>
+
+<div class="container">
+
+  <!-- ① JWT Config -->
+  <div class="card">
+    <div class="card-title"><div class="dot"></div>1 · Chat Channel JWT</div>
+    <p style="font-size:13px;color:#64748b;margin-bottom:12px;">
+      Paste the JWT from NXLink → Chat Channels → Generate Embedded JS Code for your channel (e.g. <strong>Homepro-ESIGO_CS_V2</strong>).
+    </p>
+    <div class="jwt-row">
+      <div class="form-group" style="flex:1;margin:0;">
+        <input type="text" id="jwtInput" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…" />
+      </div>
+      <button class="btn btn-primary" onclick="applyJWT()">Apply JWT</button>
+    </div>
+    <div id="jwtStatus" class="status-banner"></div>
+  </div>
+
+  <!-- ② Quick Scenarios -->
+  <div class="card">
+    <div class="card-title" style="margin-bottom:12px;"><div class="dot"></div>2 · Quick Test Scenarios</div>
+    <div class="scenario-row">
+      <button class="scenario-btn" onclick="loadScenario('guest')">👤 Guest (no identity)</button>
+      <button class="scenario-btn" onclick="loadScenario('loggedin')">🏠 Logged-in Member</button>
+      <button class="scenario-btn" onclick="loadScenario('goldmember')">⭐ Gold Member</button>
+      <button class="scenario-btn" onclick="loadScenario('platinummember')">💎 Platinum Member</button>
+      <button class="scenario-btn" onclick="loadScenario('clear')">🗑 Clear All</button>
+    </div>
+
+    <!-- ③ Identity Fields -->
+    <div class="card-title" style="margin-bottom:12px;"><div class="dot"></div>3 · Customer Identity</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>custName <span>(customer display name)</span></label>
+        <input type="text" id="custName" placeholder="e.g. สมชาย ใจดี" />
+      </div>
+      <div class="form-group">
+        <label>phoneOrigin <span>(0X-XXXX-XXXX format)</span></label>
+        <input type="text" id="phoneOrigin" placeholder="e.g. 0812345678" />
+      </div>
+      <div class="form-group">
+        <label>soldTo <span>(HomePro store code)</span></label>
+        <input type="text" id="soldTo" placeholder="e.g. 1000012345" />
+      </div>
+      <div class="form-group">
+        <label>tier <span>(membership tier)</span></label>
+        <select id="tier">
+          <option value="">— None / Guest —</option>
+          <option value="Silver">Silver</option>
+          <option value="Gold">Gold</option>
+          <option value="Platinum">Platinum</option>
+          <option value="Pro">Pro</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="launchBtn" onclick="launchChat()" disabled>🚀 Launch Chat</button>
+      <button class="btn btn-outline" onclick="reopenChat()">💬 Open Chat</button>
+      <button class="btn btn-outline" onclick="closeChat()">✕ Close Chat</button>
+      <button class="btn btn-danger" onclick="resetChat()">🔄 Reset Session</button>
+    </div>
+
+    <div id="launchStatus" class="status-banner"></div>
+  </div>
+
+  <!-- ④ Active Config Preview -->
+  <div class="card" id="configPreviewCard" style="display:none;">
+    <div class="card-title"><div class="dot"></div>4 · Active Configuration</div>
+    <div class="chip-row" id="configChips"></div>
+  </div>
+
+  <!-- ⑤ Event Log -->
+  <div class="card">
+    <div class="card-title" style="margin-bottom:12px;">
+      <div class="dot"></div>5 · Event Log
+      <button class="btn btn-outline" style="margin-left:auto;padding:4px 12px;font-size:11px;" onclick="clearLog()">Clear</button>
+    </div>
+    <div class="log-box" id="logBox">
+      <div class="log-entry info"><span class="ts">--:--:--</span>Test harness ready. Apply JWT to begin.</div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- ═══════════════════════════════════════════
+     NXLink Bootstrap v1.4 (loaded dynamically)
+═══════════════════════════════════════════ -->
+<script>
+  function log(msg, type = '') {
+    const box = document.getElementById('logBox');
+    const now = new Date();
+    const ts = now.toTimeString().slice(0,8);
+    const el = document.createElement('div');
+    el.className = 'log-entry ' + type;
+    el.innerHTML = `<span class="ts">${ts}</span>${msg}`;
+    box.appendChild(el);
+    box.scrollTop = box.scrollHeight;
+  }
+  function clearLog() {
+    document.getElementById('logBox').innerHTML = '';
+    log('Log cleared.', 'info');
+  }
+  function showStatus(id, msg, type) {
+    const el = document.getElementById(id);
+    el.className = 'status-banner ' + type;
+    const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+    el.innerHTML = `<span class="status-icon">${icons[type]||''}</span>${msg}`;
+  }
+  const SCENARIOS = {
+    guest:         { custName: '', phoneOrigin: '', soldTo: '', tier: '' },
+    loggedin:      { custName: 'สมชาย ใจดี', phoneOrigin: '0812345678', soldTo: '1000012345', tier: 'Silver' },
+    goldmember:    { custName: 'นิดา รักบ้าน', phoneOrigin: '0898765432', soldTo: '1000098765', tier: 'Gold' },
+    platinummember:{ custName: 'วิชัย สร้างบ้าน', phoneOrigin: '0856781234', soldTo: '1000011111', tier: 'Platinum' },
+    clear:         { custName: '', phoneOrigin: '', soldTo: '', tier: '' }
+  };
+  const LABELS = { guest: '👤 Guest', loggedin: '🏠 Logged-in', goldmember: '⭐ Gold', platinummember: '💎 Platinum' };
+  function loadScenario(key) {
+    const s = SCENARIOS[key]; if (!s) return;
+    document.getElementById('custName').value    = s.custName;
+    document.getElementById('phoneOrigin').value = s.phoneOrigin;
+    document.getElementById('soldTo').value      = s.soldTo;
+    document.getElementById('tier').value        = s.tier;
+    document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    log(`Scenario loaded: ${LABELS[key] || key}`, 'info');
+  }
+  let currentJWT = '';
+  function applyJWT() {
+    const jwt = document.getElementById('jwtInput').value.trim();
+    if (!jwt) { showStatus('jwtStatus', 'Please enter a JWT value.', 'error'); return; }
+    if (!jwt.startsWith('ey')) { showStatus('jwtStatus', 'JWT looks invalid — should start with "ey…".', 'error'); return; }
+    currentJWT = jwt;
+    showStatus('jwtStatus', `JWT saved (${jwt.slice(0,24)}…). Click Launch Chat to start.`, 'success');
+    document.getElementById('launchBtn').disabled = false;
+    log(`JWT applied: ${jwt.slice(0,20)}…`, 'ok');
+  }
+  function loadBootstrapScript(callback) {
+    if (document.getElementById('nx-bootstrap-script')) { callback(); return; }
+    const s = document.createElement('script');
+    s.id  = 'nx-bootstrap-script';
+    s.src = 'https://www.esigo.asia/NXAI_HP/nx-chat-bootstrap1.4.js?v=1.4';
+    s.onload = () => { log('Bootstrap v1.4 loaded.', 'ok'); callback(); };
+    s.onerror = () => { log('Failed to load bootstrap script.', 'err'); showStatus('launchStatus', 'Could not load nx-chat-bootstrap1.4.js.', 'error'); };
+    document.head.appendChild(s);
+  }
+  function launchChat() {
+    if (!currentJWT) { showStatus('launchStatus', 'Apply a JWT first.', 'error'); return; }
+    const custName    = document.getElementById('custName').value.trim();
+    const phoneOrigin = document.getElementById('phoneOrigin').value.trim();
+    const soldTo      = document.getElementById('soldTo').value.trim();
+    const tier        = document.getElementById('tier').value;
+    const isMobile = window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    const config = {
+      jwt: currentJWT,
+      popupWidth: '342px', popupHeight: '500px', popupRight: '40px', popupBottom: '190px',
+      prechatThemeColor: '#0066b3', prechatTitle: 'HomePro Live Chat',
+      backgroundImage: 'https://www.nxcloud.com/img/Chat.b0a30ee8.svg',
+      restartSessionButtonText: 'เริ่มการสนทนาใหม่',
+      endSessionBarHeight: '96px', endSessionBarBackground: 'rgba(245,245,245,0.96)',
+      custName, phoneOrigin, soldTo, tier
+    };
+    if (isMobile) {
+      config.popupWidth = 'calc(100vw - 20px)'; config.popupHeight = 'calc(100vh - 40px)';
+      config.popupRight = '10px'; config.popupBottom = '40px'; config.endSessionBarHeight = '84px';
+      log('Mobile detected — responsive sizing.', 'info');
+    }
+    if (window._nxBootstrapInstance && typeof window._nxBootstrapInstance.destroy === 'function') {
+      window._nxBootstrapInstance.destroy();
+    }
+    loadBootstrapScript(() => {
+      if (typeof NXChatBootstrap !== 'function') { showStatus('launchStatus', 'NXChatBootstrap not found.', 'error'); return; }
+      try {
+        window._nxBootstrapInstance = NXChatBootstrap(config);
+        showStatus('launchStatus', 'Chat launched! Look for the bubble at bottom-right.', 'success');
+        log(`Launched — ${custName||'guest'} | ${phoneOrigin||'-'} | ${soldTo||'-'} | ${tier||'-'}`, 'ok');
+        const card = document.getElementById('configPreviewCard');
+        const chips = document.getElementById('configChips');
+        chips.innerHTML = [['Device', isMobile?'📱 Mobile':'🖥 Desktop'],['custName',custName||'(guest)'],['phone',phoneOrigin||'(none)'],['soldTo',soldTo||'(none)'],['tier',tier||'(none)'],['size',config.popupWidth+' × '+config.popupHeight]].map(([k,v])=>`<div class="chip"><strong>${k}</strong>: ${v}</div>`).join('');
+        card.style.display = 'block';
+      } catch(e) { showStatus('launchStatus', 'Error: ' + e.message, 'error'); }
+    });
+  }
+  function reopenChat() {
+    if (window._nxBootstrapInstance?.openChat) { window._nxBootstrapInstance.openChat(); log('openChat() called.','ok'); }
+    else log('No active instance. Launch first.','err');
+  }
+  function closeChat() {
+    if (window._nxBootstrapInstance?.closeChat) { window._nxBootstrapInstance.closeChat(); log('closeChat() called.','ok'); }
+    else log('No active instance.','err');
+  }
+  function resetChat() {
+    if (window._nxBootstrapInstance?.resetSession) { log('resetSession() — reloading...','info'); window._nxBootstrapInstance.resetSession(); }
+    else { sessionStorage.clear(); log('sessionStorage cleared.','ok'); }
+  }
+  window.addEventListener('message', function(e) {
+    if (e.data?.type) {
+      const t = e.data.type;
+      if (t === 'conversationEnd') log('⚡ conversationEnd received.','info');
+      else if (t.startsWith('NX') || t.startsWith('nx') || t.includes('chat')) log(`⚡ Event: ${t}`,'info');
+    }
+  });
+</script>
+
+</body>
+</html>
