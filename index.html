@@ -240,6 +240,27 @@
     .log-entry.info { color: #60a5fa; }
     .log-entry .ts { color: #475569; margin-right: 8px; }
 
+    /* ── Device toggle ── */
+    .device-toggle {
+      display: flex;
+      gap: 6px;
+      margin-left: auto;
+    }
+    .device-btn {
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1.5px solid #e2e8f0;
+      background: #f8fafc;
+      font-size: 12px;
+      cursor: pointer;
+      color: #64748b;
+    }
+    .device-btn.active {
+      border-color: #0066b3;
+      background: #eff6ff;
+      color: #0066b3;
+    }
+
     /* ── Info chips ── */
     .chip-row {
       display: flex;
@@ -263,7 +284,7 @@
 <div class="header">
   <div class="header-logo">HP</div>
   <div class="header-title">HomePro Chat — Test Harness</div>
-  <div class="header-badge">Bootstrap v1.4</div>
+  <div class="header-badge">live_chat.min.js</div>
 </div>
 
 <div class="container">
@@ -276,7 +297,7 @@
     </p>
     <div class="jwt-row">
       <div class="form-group" style="flex:1;margin:0;">
-        <input type="text" id="jwtInput" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…" />
+        <input type="text" id="jwtInput" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…" value="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0ZW5hbnRfaWQiOiIzNTkwIiwiYXVkIjoiVmlzaXRvciBDbGllbnQiLCJjb25maWdfaWQiOiI5OSIsIm5hbWUiOiJMaXZlIENoYXQiLCJpc3MiOiJueGFpLmNvbSIsImV4cCI6NDg1NDE0Mzc2MSwiaWF0IjoxNzc4MzAzNzYxfQ.NonjDKV3eZQpYrxCAocHG1yZmhFnZEQMoPhw-51zvKU" />
       </div>
       <button class="btn btn-primary" onclick="applyJWT()">Apply JWT</button>
     </div>
@@ -351,9 +372,10 @@
 </div><!-- /container -->
 
 <!-- ═══════════════════════════════════════════
-     NXLink Bootstrap v1.4 (loaded dynamically)
+     NXLink live_chat.min.js (loaded dynamically)
 ═══════════════════════════════════════════ -->
 <script>
+  // ── Logging ──────────────────────────────────────────
   function log(msg, type = '') {
     const box = document.getElementById('logBox');
     const now = new Date();
@@ -368,12 +390,19 @@
     document.getElementById('logBox').innerHTML = '';
     log('Log cleared.', 'info');
   }
+
+  // ── Status banners ───────────────────────────────────
   function showStatus(id, msg, type) {
     const el = document.getElementById(id);
     el.className = 'status-banner ' + type;
     const icons = { success: '✅', error: '❌', info: 'ℹ️' };
     el.innerHTML = `<span class="status-icon">${icons[type]||''}</span>${msg}`;
   }
+  function hideStatus(id) {
+    document.getElementById(id).className = 'status-banner';
+  }
+
+  // ── Scenarios ────────────────────────────────────────
   const SCENARIOS = {
     guest:         { custName: '', phoneOrigin: '', soldTo: '', tier: '' },
     loggedin:      { custName: 'สมชาย ใจดี', phoneOrigin: '0812345678', soldTo: '1000012345', tier: 'Silver' },
@@ -381,9 +410,13 @@
     platinummember:{ custName: 'วิชัย สร้างบ้าน', phoneOrigin: '0856781234', soldTo: '1000011111', tier: 'Platinum' },
     clear:         { custName: '', phoneOrigin: '', soldTo: '', tier: '' }
   };
-  const LABELS = { guest: '👤 Guest', loggedin: '🏠 Logged-in', goldmember: '⭐ Gold', platinummember: '💎 Platinum' };
+  const LABELS = {
+    guest: '👤 Guest', loggedin: '🏠 Logged-in', goldmember: '⭐ Gold', platinummember: '💎 Platinum'
+  };
+
   function loadScenario(key) {
-    const s = SCENARIOS[key]; if (!s) return;
+    const s = SCENARIOS[key];
+    if (!s) return;
     document.getElementById('custName').value    = s.custName;
     document.getElementById('phoneOrigin').value = s.phoneOrigin;
     document.getElementById('soldTo').value      = s.soldTo;
@@ -392,79 +425,153 @@
     event.target.classList.add('active');
     log(`Scenario loaded: ${LABELS[key] || key}`, 'info');
   }
+
+  // ── JWT ───────────────────────────────────────────────
   let currentJWT = '';
+
   function applyJWT() {
     const jwt = document.getElementById('jwtInput').value.trim();
-    if (!jwt) { showStatus('jwtStatus', 'Please enter a JWT value.', 'error'); return; }
-    if (!jwt.startsWith('ey')) { showStatus('jwtStatus', 'JWT looks invalid — should start with "ey…".', 'error'); return; }
+    if (!jwt) {
+      showStatus('jwtStatus', 'Please enter a JWT value.', 'error');
+      return;
+    }
+    if (!jwt.startsWith('ey')) {
+      showStatus('jwtStatus', 'JWT looks invalid — it should start with "ey…". Double-check from NXLink.', 'error');
+      log('JWT validation failed.', 'err');
+      return;
+    }
     currentJWT = jwt;
     showStatus('jwtStatus', `JWT saved (${jwt.slice(0,24)}…). Click Launch Chat to start.`, 'success');
     document.getElementById('launchBtn').disabled = false;
     log(`JWT applied: ${jwt.slice(0,20)}…`, 'ok');
   }
-  function loadBootstrapScript(callback) {
-    if (document.getElementById('nx-bootstrap-script')) { callback(); return; }
+
+  // ── Remove existing widget from DOM ──────────────────
+  function destroyWidget() {
+    const old = document.getElementById('live-chat-script');
+    if (old) { old.remove(); log('Old live-chat-script removed.', 'info'); }
+    // Remove any iframe/div injected by live_chat.min.js
+    document.querySelectorAll('[id^="nx-"], [class^="nx-"], [id*="livechat"], [id*="nxchat"]').forEach(el => el.remove());
+    sessionStorage.clear();
+  }
+
+  // ── Load live_chat.min.js with JWT in URL ─────────────
+  function loadLiveChatScript(jwt) {
+    destroyWidget();
     const s = document.createElement('script');
-    s.id  = 'nx-bootstrap-script';
-    s.src = 'https://www.esigo.asia/NXAI_HP/nx-chat-bootstrap1.4.js?v=1.4';
-    s.onload = () => { log('Bootstrap v1.4 loaded.', 'ok'); callback(); };
-    s.onerror = () => { log('Failed to load bootstrap script.', 'err'); showStatus('launchStatus', 'Could not load nx-chat-bootstrap1.4.js.', 'error'); };
+    s.id  = 'live-chat-script';
+    s.src = `https://nxlink.nxcloud.com/chatbot/client/js/live_chat.min.js?jwt=${jwt}&vtime=${new Date().getTime()}`;
+    s.onload = () => {
+      log('live_chat.min.js loaded from nxlink.nxcloud.com.', 'ok');
+      // Expose any NXLink globals discovered after load
+      const keys = Object.keys(window).filter(k => /^nx/i.test(k) && typeof window[k] !== 'undefined');
+      if (keys.length) log(`NXLink globals detected: ${keys.join(', ')}`, 'info');
+    };
+    s.onerror = () => {
+      log('Failed to load live_chat.min.js. Check network / CORS.', 'err');
+      showStatus('launchStatus', 'Could not load live_chat.min.js. Check console for details.', 'error');
+    };
     document.head.appendChild(s);
   }
+
+  // ── Launch ────────────────────────────────────────────
   function launchChat() {
-    if (!currentJWT) { showStatus('launchStatus', 'Apply a JWT first.', 'error'); return; }
+    if (!currentJWT) {
+      showStatus('launchStatus', 'Apply a JWT first.', 'error');
+      return;
+    }
+
     const custName    = document.getElementById('custName').value.trim();
     const phoneOrigin = document.getElementById('phoneOrigin').value.trim();
     const soldTo      = document.getElementById('soldTo').value.trim();
     const tier        = document.getElementById('tier').value;
+
     const isMobile = window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-    const config = {
-      jwt: currentJWT,
-      popupWidth: '342px', popupHeight: '500px', popupRight: '40px', popupBottom: '190px',
-      prechatThemeColor: '#0066b3', prechatTitle: 'HomePro Live Chat',
-      backgroundImage: 'https://www.nxcloud.com/img/Chat.b0a30ee8.svg',
-      restartSessionButtonText: 'เริ่มการสนทนาใหม่',
-      endSessionBarHeight: '96px', endSessionBarBackground: 'rgba(245,245,245,0.96)',
-      custName, phoneOrigin, soldTo, tier
-    };
-    if (isMobile) {
-      config.popupWidth = 'calc(100vw - 20px)'; config.popupHeight = 'calc(100vh - 40px)';
-      config.popupRight = '10px'; config.popupBottom = '40px'; config.endSessionBarHeight = '84px';
-      log('Mobile detected — responsive sizing.', 'info');
+    if (isMobile) log('Mobile device detected.', 'info');
+
+    // Set identity params as globals BEFORE loading the script
+    // (NXLink reads these on init if present)
+    window.nxLiveChatCustomParams = { custName, phoneOrigin, soldTo, tier };
+    // Some NXLink versions use nxChatSetting
+    window.nxChatSetting = { custName, phone: phoneOrigin, soldTo, tier };
+
+    try {
+      loadLiveChatScript(currentJWT);
+      showStatus('launchStatus', 'Chat widget loading… Look for the chat bubble at the bottom-right.', 'success');
+      log(`Launch initiated — identity: ${custName||'(guest)'} | phone: ${phoneOrigin||'(none)'} | soldTo: ${soldTo||'(none)'} | tier: ${tier||'(none)'}`, 'ok');
+      updateConfigPreview({ custName, phoneOrigin, soldTo, tier }, isMobile);
+    } catch(e) {
+      showStatus('launchStatus', 'Error launching chat: ' + e.message, 'error');
+      log('Launch error: ' + e.message, 'err');
     }
-    if (window._nxBootstrapInstance && typeof window._nxBootstrapInstance.destroy === 'function') {
-      window._nxBootstrapInstance.destroy();
-    }
-    loadBootstrapScript(() => {
-      if (typeof NXChatBootstrap !== 'function') { showStatus('launchStatus', 'NXChatBootstrap not found.', 'error'); return; }
-      try {
-        window._nxBootstrapInstance = NXChatBootstrap(config);
-        showStatus('launchStatus', 'Chat launched! Look for the bubble at bottom-right.', 'success');
-        log(`Launched — ${custName||'guest'} | ${phoneOrigin||'-'} | ${soldTo||'-'} | ${tier||'-'}`, 'ok');
-        const card = document.getElementById('configPreviewCard');
-        const chips = document.getElementById('configChips');
-        chips.innerHTML = [['Device', isMobile?'📱 Mobile':'🖥 Desktop'],['custName',custName||'(guest)'],['phone',phoneOrigin||'(none)'],['soldTo',soldTo||'(none)'],['tier',tier||'(none)'],['size',config.popupWidth+' × '+config.popupHeight]].map(([k,v])=>`<div class="chip"><strong>${k}</strong>: ${v}</div>`).join('');
-        card.style.display = 'block';
-      } catch(e) { showStatus('launchStatus', 'Error: ' + e.message, 'error'); }
-    });
   }
+
+  // ── Config preview chips ──────────────────────────────
+  function updateConfigPreview(cfg, isMobile) {
+    const card = document.getElementById('configPreviewCard');
+    const chips = document.getElementById('configChips');
+    const items = [
+      ['Device',   isMobile ? '📱 Mobile' : '🖥 Desktop'],
+      ['custName', cfg.custName  || '(guest)'],
+      ['phone',    cfg.phoneOrigin || '(none)'],
+      ['soldTo',   cfg.soldTo    || '(none)'],
+      ['tier',     cfg.tier      || '(none)'],
+    ];
+    chips.innerHTML = items.map(([k,v]) =>
+      `<div class="chip"><strong>${k}</strong>: ${v}</div>`
+    ).join('');
+    card.style.display = 'block';
+  }
+
+  // ── Widget Controls ───────────────────────────────────
   function reopenChat() {
-    if (window._nxBootstrapInstance?.openChat) { window._nxBootstrapInstance.openChat(); log('openChat() called.','ok'); }
-    else log('No active instance. Launch first.','err');
+    // Try common NXLink API patterns after live_chat.min.js loads
+    if (window.nxLiveChat && typeof window.nxLiveChat.open === 'function') {
+      window.nxLiveChat.open(); log('nxLiveChat.open() called.', 'ok');
+    } else if (window.NXLiveChat && typeof window.NXLiveChat.open === 'function') {
+      window.NXLiveChat.open(); log('NXLiveChat.open() called.', 'ok');
+    } else {
+      // Try clicking the widget bubble if visible
+      const bubble = document.querySelector('[id*="nx"] button, [class*="nx"] button, #nxchat-button, .nx-chat-button');
+      if (bubble) { bubble.click(); log('Widget bubble clicked.', 'ok'); }
+      else log('No NXLink open() API found. Widget may already be visible.', 'info');
+    }
   }
   function closeChat() {
-    if (window._nxBootstrapInstance?.closeChat) { window._nxBootstrapInstance.closeChat(); log('closeChat() called.','ok'); }
-    else log('No active instance.','err');
+    if (window.nxLiveChat && typeof window.nxLiveChat.close === 'function') {
+      window.nxLiveChat.close(); log('nxLiveChat.close() called.', 'ok');
+    } else if (window.NXLiveChat && typeof window.NXLiveChat.close === 'function') {
+      window.NXLiveChat.close(); log('NXLiveChat.close() called.', 'ok');
+    } else {
+      log('No NXLink close() API found. Close the chat window manually.', 'info');
+    }
   }
   function resetChat() {
-    if (window._nxBootstrapInstance?.resetSession) { log('resetSession() — reloading...','info'); window._nxBootstrapInstance.resetSession(); }
-    else { sessionStorage.clear(); log('sessionStorage cleared.','ok'); }
+    log('Destroying widget and clearing session…', 'info');
+    destroyWidget();
+    showStatus('launchStatus', 'Session reset. Change scenario and click Launch Chat again.', 'info');
+    document.getElementById('configPreviewCard').style.display = 'none';
+    log('Widget removed, sessionStorage cleared. Ready to relaunch.', 'ok');
   }
+
+  // ── Auto-apply pre-filled JWT on load ─────────────────
+  window.addEventListener('DOMContentLoaded', () => {
+    const jwtField = document.getElementById('jwtInput');
+    if (jwtField && jwtField.value.startsWith('ey')) {
+      applyJWT();
+      log('JWT pre-filled — ready to launch.', 'info');
+    }
+  });
+
+  // ── Intercept NXLink widget events ───────────────────
   window.addEventListener('message', function(e) {
-    if (e.data?.type) {
+    if (e.data && e.data.type) {
       const t = e.data.type;
-      if (t === 'conversationEnd') log('⚡ conversationEnd received.','info');
-      else if (t.startsWith('NX') || t.startsWith('nx') || t.includes('chat')) log(`⚡ Event: ${t}`,'info');
+      if (t === 'conversationEnd') {
+        log('⚡ Event: conversationEnd received.', 'info');
+      } else if (t.startsWith('NX') || t.startsWith('nx') || t.includes('chat')) {
+        log(`⚡ Event: ${t}`, 'info');
+      }
     }
   });
 </script>
