@@ -284,7 +284,7 @@
 <div class="header">
   <div class="header-logo">HP</div>
   <div class="header-title">HomePro Chat — Test Harness</div>
-  <div class="header-badge">live_chat.min.js</div>
+  <div class="header-badge">Bootstrap v1.4</div>
 </div>
 
 <div class="container">
@@ -446,28 +446,21 @@
     log(`JWT applied: ${jwt.slice(0,20)}…`, 'ok');
   }
 
-  // ── Remove existing widget from DOM ──────────────────
+  // ── Destroy widget — remove all NXLink DOM + storage ─
   function destroyWidget() {
     // Remove script tag
     const old = document.getElementById('live-chat-script');
-    if (old) { old.remove(); log('Old script removed.', 'info'); }
+    if (old) old.remove();
 
-    // Remove ALL iframes (NXLink chat lives inside one)
-    document.querySelectorAll('iframe').forEach(el => {
-      log(`Removed iframe: ${(el.src||'').slice(0,60)}`, 'info');
-      el.remove();
-    });
+    // Remove ALL iframes (NXLink chat iframe lives here)
+    document.querySelectorAll('iframe').forEach(el => el.remove());
 
-    // Remove any NXLink-injected top-level elements
+    // Remove NXLink-injected top-level body elements
     document.querySelectorAll('body > div:not(.header):not(.container)').forEach(el => el.remove());
 
-    // Clear session + local storage (NXLink uses both)
+    // Clear ALL localStorage + sessionStorage (aggressive wipe)
+    try { localStorage.clear(); } catch(e) {}
     try { sessionStorage.clear(); } catch(e) {}
-    try {
-      Object.keys(localStorage)
-        .filter(k => /nx|chat|livechat/i.test(k))
-        .forEach(k => { localStorage.removeItem(k); log(`Cleared localStorage key: ${k}`, 'info'); });
-    } catch(e) {}
   }
 
   // ── Load live_chat.min.js with JWT + identity in URL ──
@@ -541,11 +534,13 @@
 
   // ── Widget Controls ───────────────────────────────────
   function reopenChat() {
+    // Try common NXLink API patterns after live_chat.min.js loads
     if (window.nxLiveChat && typeof window.nxLiveChat.open === 'function') {
       window.nxLiveChat.open(); log('nxLiveChat.open() called.', 'ok');
     } else if (window.NXLiveChat && typeof window.NXLiveChat.open === 'function') {
       window.NXLiveChat.open(); log('NXLiveChat.open() called.', 'ok');
     } else {
+      // Try clicking the widget bubble if visible
       const bubble = document.querySelector('[id*="nx"] button, [class*="nx"] button, #nxchat-button, .nx-chat-button');
       if (bubble) { bubble.click(); log('Widget bubble clicked.', 'ok'); }
       else log('No NXLink open() API found. Widget may already be visible.', 'info');
@@ -561,44 +556,31 @@
     }
   }
   function resetChat() {
-    log('Resetting session — reloading page to guarantee clean state…', 'info');
-    // Save current JWT + scenario so the page restores on reload
-    const snap = {
-      jwt:         document.getElementById('jwtInput').value.trim(),
-      custName:    document.getElementById('custName').value.trim(),
-      phoneOrigin: document.getElementById('phoneOrigin').value.trim(),
-      soldTo:      document.getElementById('soldTo').value.trim(),
-      tier:        document.getElementById('tier').value,
-    };
-    try { sessionStorage.setItem('_nxHarnessSnap', JSON.stringify(snap)); } catch(e) {}
+    log('Resetting — destroying widget and wiping all storage…', 'info');
 
-    // Wipe NXLink storage keys, then reload
-    try {
-      Object.keys(localStorage)
-        .filter(k => /nx|chat|livechat/i.test(k))
-        .forEach(k => localStorage.removeItem(k));
-    } catch(e) {}
+    // 1. Tear down widget in-place (no page reload needed)
+    destroyWidget();
 
-    location.reload();
+    // 2. Reset UI
+    document.getElementById('configPreviewCard').style.display = 'none';
+    hideStatus('launchStatus');
+
+    // 3. Re-enable Launch button — JWT is still in the input
+    const jwt = document.getElementById('jwtInput').value.trim();
+    if (jwt.startsWith('ey')) {
+      currentJWT = jwt;
+      document.getElementById('launchBtn').disabled = false;
+      showStatus('launchStatus', 'Session cleared. Pick a scenario and click Launch Chat to start fresh.', 'info');
+      log('Widget removed, storage wiped. Ready for new session.', 'ok');
+    } else {
+      currentJWT = '';
+      document.getElementById('launchBtn').disabled = true;
+      log('Session cleared — re-apply JWT before launching.', 'info');
+    }
   }
 
-  // ── Restore state after reset-reload ─────────────────
+  // ── Auto-apply JWT on first page load ────────────────
   window.addEventListener('DOMContentLoaded', () => {
-    try {
-      const raw = sessionStorage.getItem('_nxHarnessSnap');
-      if (raw) {
-        sessionStorage.removeItem('_nxHarnessSnap');
-        const snap = JSON.parse(raw);
-        if (snap.jwt)         document.getElementById('jwtInput').value      = snap.jwt;
-        if (snap.custName)    document.getElementById('custName').value       = snap.custName;
-        if (snap.phoneOrigin) document.getElementById('phoneOrigin').value    = snap.phoneOrigin;
-        if (snap.soldTo)      document.getElementById('soldTo').value         = snap.soldTo;
-        if (snap.tier)        document.getElementById('tier').value           = snap.tier;
-        log('Session reset complete — identity restored. Ready to relaunch.', 'ok');
-      }
-    } catch(e) {}
-
-    // Auto-apply JWT if pre-filled
     const jwtField = document.getElementById('jwtInput');
     if (jwtField && jwtField.value.startsWith('ey')) {
       applyJWT();
